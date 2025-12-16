@@ -1,0 +1,5 @@
+*.csv
+*.xlsx
+.env
+DATA_ORGANISED/
+TTEnv
