@@ -501,8 +501,10 @@ def get_mega_dataframe(xp_res_dir: str, df_meta: pd.DataFrame) -> pd.DataFrame:
 
             # Ajout du sexe, IMC et Traitement
             df_sum['SEXE'] = df_meta.loc[(df_meta["Date"] == date ) & (df_meta['Scene'] == scene), ['Sexe']].values[0][0]
+            df_sum['ESPECE'] = df_meta.loc[(df_meta["Date"] == date ) & (df_meta['Scene'] == scene), ['Espèce']].values[0][0]
             df_sum['IMC'] = df_meta.loc[(df_meta["Date"] == date ) & (df_meta['Scene'] == scene), ['IMC']].values[0][0]
             df_sum['TRAITEMENT'] = df_meta.loc[(df_meta["Date"] == date ) & (df_meta['Scene'] == scene), ['Traitement']].values[0][0]
+            
 
             list_df.append(df_sum)
     
