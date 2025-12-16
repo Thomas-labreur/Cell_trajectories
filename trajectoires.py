@@ -45,6 +45,8 @@ if "dataframes" not in st.session_state:
     st.session_state["dataframes"] = []
 if 'scenes' not in st.session_state:
     st.session_state['scenes'] = []
+if 'color_column' not in st.session_state:
+    st.session_state['color_column'] = ""
 if "export_data" not in st.session_state:
     st.session_state.export_data = None
     st.session_state.export_name = None
@@ -57,6 +59,7 @@ if "export_data" not in st.session_state:
 
 st.set_page_config(layout="wide")
 st.title("Trajectoires cellulaires")
+st.write("------------------------")
 st.subheader('Sélection des données')
 
 # -------- sélection hiérarchique --------
@@ -135,10 +138,10 @@ if st.session_state["metadata"]:
 # 2. AFFICHAGE DES DONNÉES
 ####################################################################################################################
 
-st.subheader("Liste des scènes sélectionnées")
+st.write("**Liste des scènes sélectionnées**")
 
 if st.session_state["metadata"]:
-    st.write("Le Scène ID ci-dessous a été ajouté pour identifier" + 
+    st.write("Le SceneID ci-dessous a été ajouté pour identifier" + 
                 "à quelle scène appartient chaque cellule, il a été également" +
                 "ajouté en préfixe des TrackID de chaque cellule (voire section suivante)")
 
@@ -169,6 +172,10 @@ if st.session_state["metadata"]:
 ####################################################################################################################
 
 st.sidebar.header("Paramètres de la figure")
+
+st.sidebar.subheader('Légende')
+show_legend = st.sidebar.checkbox("Afficher la légende", value=True, on_change=invalidate_export)
+
 st.sidebar.subheader('Échelles')
 
 # Graduations
@@ -186,7 +193,7 @@ show_grid = st.sidebar.checkbox("Afficher la grille", value=True)
 
 # Échelles des axes (zoom)
 axis_range = st.sidebar.slider(
-    "Échelle des axes X/Y",
+    "Range de l'axe Y",
     min_value=0,
     max_value=300,
     value=100,  
@@ -215,44 +222,74 @@ legend_font = st.sidebar.number_input("Légende", value=18, on_change=invalidate
 ####################################################################################################################
 
 if st.session_state['metadata']:
-
-    st.subheader('Figure')
+    st.write("------------------------")
+    st.subheader('Fltrage et coloration')
 
     # # Filtres
     track_ids_all = sorted(df_pos["TrackID"].unique())
     track_ids = st.multiselect(
-        "TrackID",
+        "TrackIDs à tracer",
         track_ids_all,
         default=track_ids_all
     )
 
-    show_legend = st.checkbox("Afficher la légende", value=True)
-
     # Choix de coloration
     color_columns = ["TrackID"] + COLUMNS_OF_INTEREST
-    color_choice = st.selectbox("Choisir la colonne pour colorer", color_columns, on_change=invalidate_export)
+    color_column = str(st.selectbox("Choisir la colonne pour colorer", color_columns, on_change=invalidate_export))
     df_plot = df_pos.copy()
 
     # Ajouter la colonne choisie pour colorer si ce n'est pas TrackID
-    if color_choice in color_columns[1:]:
-        df_plot[color_choice] = df_plot["SceneID"].map(
-            df_meta.set_index("SceneID")[color_choice]
+    if color_column in color_columns[1:]:
+        df_plot[color_column] = df_plot["SceneID"].map(
+            df_meta.set_index("SceneID")[color_column]
         )
 
     # Filtrage
     df_plot = df_plot[df_plot["TrackID"].isin(track_ids)].astype(str)
+    color_discrete_map = None
 
+    # Choix des couleurs
+    if color_column != 'TrackID':
+        classes = sorted(df_plot[color_column].unique())
+
+        # Initialisation du dictionnaire de couleurs dans le session_state
+        if "color_map" not in st.session_state or st.session_state.get("color_column") != color_column:
+            st.session_state["color_map"] = {
+                c: px.colors.qualitative.Dark24[i % len(px.colors.qualitative.Dark24)]
+                for i, c in enumerate(classes)
+        }
+
+        st.write('Choix des couleurs')    
+        col = st.columns(len(classes))
+        # Sélecteur de couleurs
+        for i, c in enumerate(classes):
+            with col[i]:
+                st.session_state["color_map"][c] = st.color_picker(
+                    label=c,
+                    value=st.session_state["color_map"][c],
+                    key=f"color_{color_column}_{c}",
+                    on_change=invalidate_export
+                )
+
+        color_discrete_map = st.session_state["color_map"]
+
+####################################################################################################################
+# 4. TRACÉ DE LA FIGURE
+####################################################################################################################
+
+    st.write("------------------------")
+    st.subheader("Figure")
 
     # Plot
     fig = px.line(
         df_plot,
         x="PositionX_Relative",
         y="PositionY_Relative",
-        color=color_choice,
+        color=color_column,
         line_group='TrackID',
         width = FIG_WIDTH,
         height = FIG_HEIGHT,
-        color_discrete_sequence=px.colors.qualitative.Dark24
+        color_discrete_map=color_discrete_map
     )
 
     # Appliquer l'échelle de la sidebar
@@ -270,7 +307,7 @@ if st.session_state['metadata']:
         title = dict(text=fig_title, font=dict(size=title_font)),
         showlegend=show_legend, 
         legend=dict(
-            title_text=color_choice,
+            title_text=color_column,
             title_font=dict(size=legend_title_font),
             font=dict(size=legend_font),
             traceorder="normal"
@@ -293,7 +330,7 @@ if st.session_state['metadata']:
               "sont pas prises en compte dans l'export, seules celles faites avec les menus sur le "+
               "coté et au dessus de la figure le seront.")
 
-    figure_fname = f"trajectoires_{date}_scene{scene}"
+    figure_fname = "trajectoires"
     export_format = st.selectbox("Format", ["PNG", "HTML"], on_change=invalidate_export)
     c1, c2 = st.columns(2)
 
