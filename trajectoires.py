@@ -292,6 +292,19 @@ if st.session_state['metadata']:
         color_discrete_map=color_discrete_map
     )
 
+    # Forcer les couleurs directement sur chaque trace
+    if color_column != 'TrackID':
+        for trace in fig.data:
+            # Le nom de la trace correspond à la valeur de la colonne couleur
+            trace_color = color_discrete_map.get(trace.name)
+            if trace_color:
+                trace.line.color = trace_color
+    else:
+        # Pour TrackID, s'assurer que chaque trace garde sa couleur assignée par Plotly
+        colors = px.colors.qualitative.Dark24
+        for i, trace in enumerate(fig.data):
+            trace.line.color = colors[i % len(colors)]
+
     # Appliquer l'échelle de la sidebar
     # Appliquer ticks et grille
     gridcolor ="rgba(128, 128, 128, 0.3)"
